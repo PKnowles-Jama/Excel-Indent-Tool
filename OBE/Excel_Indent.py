@@ -1,0 +1,45 @@
+# Excel_Indent
+
+import pandas as pd
+import os
+from openpyxl import load_workbook
+
+def indent_function(excel_file, numbering_column, indent_column):
+    # excel_file: file name to manipulate
+    # numbering_column: index or name of column to use for indent information
+    # indent_coumn: index or name of column to be indented
+
+    df = pd.read_excel(excel_file)  # Read with pandas for data manipulation
+    book = load_workbook(excel_file) # Load with openpyxl for formatting
+
+    # ... (Get sheet - you'll need to specify which sheet)
+    sheet_name = book.sheetnames[0] # Example: Get the first sheet
+    sheet = book[sheet_name]
+
+    # ... (Get column indices - convert from name or index if needed)
+    numbering_col_index = df.columns.get_loc(numbering_column) + 1 if isinstance(numbering_column, str) else numbering_column + 1 # openpyxl is 1-based index
+    indent_col_index = df.columns.get_loc(indent_column) + 1 if isinstance(indent_column, str) else indent_column + 1
+
+    for row_index in range(2, len(df) + 2):  # Iterate through rows (openpyxl is 1-based and starts from row 1)
+        try:
+            indent_level = int(df.iloc[row_index -2, numbering_col_index - 1])  # Get indent level from dataframe (pandas is 0-based)
+            cell = sheet.cell(row=row_index, column=indent_col_index)
+            cell.value = df.iloc[row_index - 2, indent_col_index - 1] # Set the value from the dataframe
+            cell.alignment = cell.alignment.copy(indent=indent_level)  # Set the indent
+
+        except (ValueError, TypeError, AttributeError): # Handle potential errors like missing alignment
+            print(f"Warning: Row {row_index}: Invalid data or formatting issue. Skipping indentation for this row.")
+
+    # Save the changes
+    suffix = "_new"
+    base_name, ext = os.path.splitext(excel_file)
+    excel_file2 = os.path.join(os.path.dirname(excel_file), f"{base_name}{suffix}{ext}")
+    #df.to_excel(excel_file2, index=False)
+    print(f"File '{excel_file2}' updated successfully.")
+    book.save(excel_file2)
+
+file = "ExcelIndentFunctionTestFile.xlsx"
+numbering = 2
+indent = 1
+indent_function(file, numbering, indent)
+    
