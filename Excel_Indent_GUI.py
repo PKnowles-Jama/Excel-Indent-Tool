@@ -115,7 +115,9 @@ class ExcelProcessorGUI(QWidget):
         self.output_console.append("--- Starting Processing ---") # Processing start message
         file, numbering_column, heading_column, output1 = calculate_indents_and_save_new_excel(self.file_path, self.heading_column_name) # Call Indent Calulator
         self.output_console.append(f"Function 1 Output:\n{output1}") # Indent Calculator Output Messages
-        output2 = indent_function(file, numbering_column, heading_column) # Call Indenting Function
+        root, ext = os.path.splitext(self.file_path)
+        new_file_path = f"{root}_new{ext}"
+        output2 = indent_function(new_file_path, numbering_column, heading_column) # Call Indenting Function
         self.output_console.append(f"\nFunction 2 Output:\n{output2}") # Indenting Function Output Messages
         self.output_console.append("--- Processing Finished ---") # Processing end message
         self.adjustSize() # Adjust window size to show console
