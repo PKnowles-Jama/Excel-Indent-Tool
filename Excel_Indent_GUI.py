@@ -40,7 +40,7 @@ class ExcelProcessorGUI(QWidget):
         self.select_file_button = QPushButton("Select .xlsx File")
         self.select_file_button.clicked.connect(self.select_excel_file)
         file_selection_layout.addWidget(self.select_file_button)
-        
+        self.select_file_button.setStyleSheet("background-color: #0052CC; color: white;") # Set the button color
         self.file_path_label = QLabel("No file selected")
         file_selection_layout.addWidget(self.file_path_label)
         main_layout.addLayout(file_selection_layout)
@@ -59,6 +59,7 @@ class ExcelProcessorGUI(QWidget):
         self.run_button = QPushButton("Run Processing")
         self.run_button.clicked.connect(self.run_processing)
         self.run_button.setEnabled(False) # Initially disabled
+        self.run_button.setStyleSheet("background-color: #53575A; color: white;") # Set the button color
         main_layout.addWidget(self.run_button)
 
         # Output Console (initially hidden)
@@ -82,6 +83,7 @@ class ExcelProcessorGUI(QWidget):
         if file_path:
             self.file_path = file_path
             self.file_path_label.setText(f"Selected: {self.file_path}")
+            self.select_file_button.setStyleSheet("background-color: #53575A; color: white;") # Set the button color
             self.check_enable_run_button()
 
     def update_heading_column_name(self, text):
@@ -101,6 +103,7 @@ class ExcelProcessorGUI(QWidget):
         #
         if self.file_path and self.heading_column_name:
             self.run_button.setEnabled(True)
+            self.run_button.setStyleSheet("background-color: #0052CC; color: white;") # Set the button color
         else:
             self.run_button.setEnabled(False)
 
@@ -113,12 +116,22 @@ class ExcelProcessorGUI(QWidget):
         self.output_console.clear() # Clear previous output
         self.output_console.setVisible(True) # Show the console
         self.output_console.append("--- Starting Processing ---") # Processing start message
-        file, numbering_column, heading_column, output1 = calculate_indents_and_save_new_excel(self.file_path, self.heading_column_name) # Call Indent Calulator
+        
+        # Call Indent Calulator - it now returns the full path of the _new file
+        new_file_path, numbering_column, heading_column, output1 = calculate_indents_and_save_new_excel(self.file_path, self.heading_column_name)
         self.output_console.append(f"Function 1 Output:\n{output1}") # Indent Calculator Output Messages
-        root, ext = os.path.splitext(self.file_path)
-        new_file_path = f"{root}_new{ext}"
-        output2 = indent_function(new_file_path, numbering_column, heading_column) # Call Indenting Function
-        self.output_console.append(f"\nFunction 2 Output:\n{output2}") # Indenting Function Output Messages
+        
+        # Check if new_file_path is valid before proceeding to indent_function
+        if new_file_path:
+            output2 = indent_function(new_file_path, numbering_column, heading_column) # Call Indenting Function
+            self.output_console.append(f"\nFunction 2 Output:\n{output2}") # Indenting Function Output Messages
+            self.output_console.append("")
+            self.output_console.append("Final Status: SUCCESS") # Success Message
+        else:
+            self.output_console.append("\nError: Could not create the intermediate '_new' Excel file. Indentation function not executed.")
+            self.output_console.append("")
+            self.output_console.append("Final Status: FAILURE") # Failure Message
+    
         self.output_console.append("--- Processing Finished ---") # Processing end message
         self.adjustSize() # Adjust window size to show console
 
@@ -128,4 +141,3 @@ if __name__ == "__main__":
     window = ExcelProcessorGUI()
     window.show()
     sys.exit(app.exec())
-

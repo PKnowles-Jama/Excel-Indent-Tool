@@ -9,14 +9,14 @@ def indent_function(excel_file, heading_column, indent_column):
     """
     Reads an Excel file, applies indentation to a specified column
     based on values in another column, and saves the modified DataFrame
-    to a new Excel file with an '_indented' suffix.
+    to a new Excel file with an '_indented' suffix in the same directory.
 
     Args:
-        excel_file (str): The name of the Excel file to manipulate.
+        excel_file (str): The full path to the Excel file to manipulate.
         heading_column (str or int): The name or index of the column
-                                     containing the numerical indent information.
+                                      containing the numerical indent information.
         indent_column (str or int): The name or index of the column
-                                    whose values are to be indented.
+                                     whose values are to be indented.
 
     Returns:
         tuple: A tuple containing:
@@ -29,7 +29,7 @@ def indent_function(excel_file, heading_column, indent_column):
     try:
         # Create a dataframe from the excel file
         df = pd.read_excel(excel_file)
-        output.append(f"Successfully read '{excel_file}'.")
+        output.append(f"Successfully read file.")
     except FileNotFoundError:
         output.append(f"Error: File '{excel_file}' not found.")
         return "", output
@@ -94,26 +94,25 @@ def indent_function(excel_file, heading_column, indent_column):
     else:
         df[indent_column] = indented_values
 
-
     # Save the changes
     suffix = "_indented"
     base_name, ext = os.path.splitext(excel_file)
-    excel_file2 = os.path.join(os.path.dirname(excel_file), f"{base_name}{suffix}{ext}")
+    # Ensure the new file is saved in the same directory as the original
+    excel_file2 = os.path.join(os.path.dirname(excel_file), f"{os.path.basename(base_name)}{suffix}{ext}")
 
     try:
         df.to_excel(excel_file2, index=False)
         output.append(f"File '{excel_file2}' updated successfully.")
-        return output
+        return excel_file2, output # Return the full path of the new file
     except Exception as e:
         output.append(f"Error saving Excel file '{excel_file2}': {e}")
         return "", output
 
 def calculate_indents_and_save_new_excel(excel_file_name: str, heading_column: str = 'Heading') -> tuple:
     """
-    Reads an Excel file (assumed to be in the same directory as the script),
-    calculates the number of indents for each entry in a specified heading column,
+    Reads an Excel file, calculates the number of indents for each entry in a specified heading column,
     appends these indents as a new column to the DataFrame, and then saves
-    the modified DataFrame to a new Excel file with a '_new' suffix.
+    the modified DataFrame to a new Excel file with a '_new' suffix in the same directory as the input file.
 
     The indent calculation logic is as follows:
     - For numbered headings (e.g., '1. Title', '1.1 Subtitle', '1.1.1 Sub-Subtitle'):
@@ -126,17 +125,16 @@ def calculate_indents_and_save_new_excel(excel_file_name: str, heading_column: s
       The indent is one more than the indent of the last encountered numbered heading.
 
     Args:
-        excel_file_name (str): The name of the Excel file (e.g., 'my_data.xlsx').
-                               It is assumed this file is in the current working directory.
+        excel_file_name (str): The full path to the Excel file (e.g., 'C:/Users/User/Documents/my_data.xlsx').
         heading_column (str, optional): The name of the column in the Excel file
                                         that contains the headings. Defaults to 'Heading'.
 
     Returns:
         tuple: A tuple containing:
-            - str: The path to the newly created Excel file, or an empty string if an error occurred.
-            - list: A list of strings containing all output messages from the function.
+            - str: The full path to the newly created Excel file, or an empty string if an error occurred.
             - int: The column index of the newly added 'Calculated Indents' column, or -1 if not created.
             - int: The column index of the 'Heading' column, or -1 if not found.
+            - list: A list of strings containing all output messages from the function.
     """
     output = []
     df = None
@@ -146,17 +144,17 @@ def calculate_indents_and_save_new_excel(excel_file_name: str, heading_column: s
 
     try:
         df = pd.read_excel(excel_file_name)
-        output.append(f"Successfully read '{excel_file_name}'.")
+        output.append(f"Successfully read file.")
     except FileNotFoundError:
-        output.append(f"Error: File '{excel_file_name}' not found in the current directory.")
-        return "", output, new_column_index, heading_column_index
+        output.append(f"Error: File '{excel_file_name}' not found.")
+        return "", new_column_index, heading_column_index, output # Corrected return order
     except Exception as e:
         output.append(f"Error reading Excel file '{excel_file_name}': {e}")
-        return "", output, new_column_index, heading_column_index
+        return "", new_column_index, heading_column_index, output # Corrected return order
 
     if heading_column not in df.columns:
         output.append(f"Error: '{heading_column}' column not found in the Excel file.")
-        return "", output, new_column_index, heading_column_index
+        return "", new_column_index, heading_column_index, output # Corrected return order
 
     calculated_indents = []
     last_numbered_heading_indent = -1
@@ -186,14 +184,14 @@ def calculate_indents_and_save_new_excel(excel_file_name: str, heading_column: s
     except KeyError as e:
         output.append(f"Error getting column index: {e}. This should not happen after successful column creation/check.")
 
-
-    name, ext = os.path.splitext(excel_file_name)
-    output_excel_file_name = f"{name}_new{ext}"
+    # Construct the output file name to be in the same directory as the input
+    base_name, ext = os.path.splitext(excel_file_name)
+    output_excel_file_name = os.path.join(os.path.dirname(excel_file_name), f"{os.path.basename(base_name)}_new{ext}")
 
     try:
         df.to_excel(output_excel_file_name, index=False)
-        output.append(f"Successfully saved results to '{output_excel_file_name}'.")
+        output.append(f"Successfully saved results to: '{output_excel_file_name}'.")
         return output_excel_file_name, new_column_index, heading_column_index, output
     except Exception as e:
         output.append(f"Error saving Excel file '{output_excel_file_name}': {e}")
-        return "", output
+        return "", new_column_index, heading_column_index, output # Corrected return order
