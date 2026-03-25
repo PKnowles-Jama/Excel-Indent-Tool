@@ -5,7 +5,7 @@ a = Analysis(
     ['Excel_Indent_GUI.py'],
     pathex=[],
     binaries=[],
-    datas=[('jama_logo_icon.png', '.')],
+    datas=[('jama_logo.png', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,4 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['jama_logo_icon.ico'],
 )

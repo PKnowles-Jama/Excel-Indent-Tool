@@ -4,19 +4,21 @@ import pandas as pd
 import os
 import re
 import sys
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment
 
 def indent_function(excel_file, heading_column, indent_column):
     """
-    Reads an Excel file, applies indentation to a specified column
-    based on values in another column, and saves the modified DataFrame
+    Reads an Excel file, applies native Excel indentation to a specified column
+    based on values in another column, and saves the modified workbook
     to a new Excel file with an '_indented' suffix in the same directory.
 
     Args:
         excel_file (str): The full path to the Excel file to manipulate.
         heading_column (str or int): The name or index of the column
-                                      containing the numerical indent information.
+                                     containing the numerical indent information.
         indent_column (str or int): The name or index of the column
-                                     whose values are to be indented.
+                                     whose cells are to be indented.
 
     Returns:
         tuple: A tuple containing:
@@ -24,12 +26,13 @@ def indent_function(excel_file, heading_column, indent_column):
             - list: A list of strings containing all output messages from the function.
     """
     output = []
-    excel_file2 = "" # Initialize excel_file2 for error return
+    excel_file2 = "" 
 
     try:
-        # Create a dataframe from the excel file
-        df = pd.read_excel(excel_file)
-        output.append(f"Successfully read file.")
+        # Load workbook using openpyxl to manipulate formatting directly
+        wb = load_workbook(excel_file)
+        ws = wb.active # Operates on the primary/active sheet
+        output.append("Successfully read file with openpyxl.")
     except FileNotFoundError:
         output.append(f"Error: File '{excel_file}' not found.")
         return "", output
@@ -37,76 +40,73 @@ def indent_function(excel_file, heading_column, indent_column):
         output.append(f"Error reading Excel file '{excel_file}': {e}")
         return "", output
 
-    numbering_series = None
-    indent_series = None
+    # Extract headers from the first row to map column names to openpyxl's 1-based indices
+    headers = [cell.value for cell in ws[1]]
+
+    def get_col_idx(col_identifier):
+        """Helper to convert pandas 0-based index or string to openpyxl 1-based index."""
+        if isinstance(col_identifier, str):
+            if col_identifier in headers:
+                return headers.index(col_identifier) + 1
+        elif isinstance(col_identifier, int):
+            # Convert pandas 0-based column index to openpyxl 1-based index
+            if 0 <= col_identifier < len(headers):
+                return col_identifier + 1
+        return -1
 
     # Identify the column to be used for number of indents
-    if isinstance(heading_column, str):
-        if heading_column in df.columns:
-            numbering_series = df[heading_column]
-        else:
-            output.append(f"Error: Heading column '{heading_column}' not found in the Excel file.")
-            return "", output
-    elif isinstance(heading_column, int):
-        if 0 <= heading_column < len(df.columns):
-            numbering_series = df.iloc[:, heading_column]
-        else:
-            output.append(f"Error: Heading column index {heading_column} is out of bounds.")
-            return "", output
-    else:
-        output.append("Error: 'heading_column' must be a string (column name) or an integer (column index).")
+    heading_col_idx = get_col_idx(heading_column)
+    if heading_col_idx == -1:
+        output.append(f"Error: Heading column '{heading_column}' not found or out of bounds.")
         return "", output
 
     # Identify the column to be indented
-    if isinstance(indent_column, str):
-        if indent_column in df.columns:
-            indent_series = df[indent_column]
-        else:
-            output.append(f"Error: Indent column '{indent_column}' not found in the Excel file.")
-            return "", output
-    elif isinstance(indent_column, int):
-        if 0 <= indent_column < len(df.columns):
-            indent_series = df.iloc[:, indent_column]
-            # If indent_column is an int, we need to get the actual column name for updating df
-            indent_column_name = df.columns[indent_column]
-        else:
-            output.append(f"Error: Indent column index {indent_column} is out of bounds.")
-            return "", output
-    else:
-        output.append("Error: 'indent_column' must be a string (column name) or an integer (column index).")
+    indent_col_idx = get_col_idx(indent_column)
+    if indent_col_idx == -1:
+        output.append(f"Error: Indent column '{indent_column}' not found or out of bounds.")
         return "", output
 
-    indented_values = []
-    for i in range(len(df)):
-        try:
-            # Ensure the value is converted to a string before attempting int conversion, just in case
-            indent_level = int(str(numbering_series.iloc[i]))
-            indent_str = "    " * indent_level # Using 4 spaces for an indent
-            indented_value = f"{indent_str}{indent_series.iloc[i]}"
-            indented_values.append(indented_value)
-        except (ValueError, TypeError):
-            output.append(f"Warning: Row {i+1}: Invalid or missing numeric value in heading column ('{heading_column}'). Skipping indentation for this row and keeping original value.")
-            indented_values.append(indent_series.iloc[i])
+    # Iterate through rows starting from row 2 (skipping header)
+    for row in range(2, ws.max_row + 1):
+        heading_cell = ws.cell(row=row, column=heading_col_idx)
+        indent_cell = ws.cell(row=row, column=indent_col_idx)
 
-    # Update the dataframe
-    if isinstance(indent_column, int):
-        df[indent_column_name] = indented_values
-    else:
-        df[indent_column] = indented_values
+        try:
+            if heading_cell.value is not None:
+                # Get the numerical indent level
+                indent_level = int(float(heading_cell.value))
+                
+                # Apply native Excel indentation using openpyxl Alignment
+                # We copy existing alignment properties so we don't overwrite things like wrap_text
+                current_alignment = indent_cell.alignment
+                if current_alignment:
+                    indent_cell.alignment = Alignment(
+                        horizontal=current_alignment.horizontal,
+                        vertical=current_alignment.vertical,
+                        text_rotation=current_alignment.text_rotation,
+                        wrap_text=current_alignment.wrap_text,
+                        shrink_to_fit=current_alignment.shrink_to_fit,
+                        indent=indent_level
+                    )
+                else:
+                    indent_cell.alignment = Alignment(indent=indent_level)
+
+        except (ValueError, TypeError):
+            output.append(f"Warning: Row {row}: Invalid or missing numeric value in heading column. Skipping indentation for this row.")
 
     # Save the changes
     suffix = "_indented"
     base_name, ext = os.path.splitext(excel_file)
-    # Ensure the new file is saved in the same directory as the original
     excel_file2 = os.path.join(os.path.dirname(excel_file), f"{os.path.basename(base_name)}{suffix}{ext}")
 
     try:
-        df.to_excel(excel_file2, index=False)
+        wb.save(excel_file2)
         output.append(f"File '{excel_file2}' updated successfully.")
-        return excel_file2, output # Return the full path of the new file
+        return excel_file2, output 
     except Exception as e:
         output.append(f"Error saving Excel file '{excel_file2}': {e}")
         return "", output
+
 
 def calculate_indents_and_save_new_excel(excel_file_name: str, heading_column: str = 'Heading') -> tuple:
     """
@@ -147,14 +147,14 @@ def calculate_indents_and_save_new_excel(excel_file_name: str, heading_column: s
         output.append(f"Successfully read file.")
     except FileNotFoundError:
         output.append(f"Error: File '{excel_file_name}' not found.")
-        return "", new_column_index, heading_column_index, output # Corrected return order
+        return "", new_column_index, heading_column_index, output
     except Exception as e:
         output.append(f"Error reading Excel file '{excel_file_name}': {e}")
-        return "", new_column_index, heading_column_index, output # Corrected return order
+        return "", new_column_index, heading_column_index, output 
 
     if heading_column not in df.columns:
         output.append(f"Error: '{heading_column}' column not found in the Excel file.")
-        return "", new_column_index, heading_column_index, output # Corrected return order
+        return "", new_column_index, heading_column_index, output 
 
     calculated_indents = []
     last_numbered_heading_indent = -1
@@ -194,4 +194,4 @@ def calculate_indents_and_save_new_excel(excel_file_name: str, heading_column: s
         return output_excel_file_name, new_column_index, heading_column_index, output
     except Exception as e:
         output.append(f"Error saving Excel file '{output_excel_file_name}': {e}")
-        return "", new_column_index, heading_column_index, output # Corrected return order
+        return "", new_column_index, heading_column_index, output
